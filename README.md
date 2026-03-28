@@ -129,11 +129,14 @@ hook.register(Key.NUM_1, callback)
 hook.register("1", callback)     # VK name still supported
 hook.register(0x1B, callback)
 hook.register_combo("CTRL+SHIFT+S", callback)
+hook.register_combo(KeyCombo(Key.CTRL, "S"), callback)
 ```
 
 Exports:
 - `keyboard_hook.Key`
+- `keyboard_hook.KeyCombo`
 - `keyboard_hook.VK`
+- `keyboard_hook.KeyWriter`
 - `keyboard_hook.once`
 - `keyboard_hook.keydown_only`
 - `keyboard_hook.keyup_only`
@@ -177,6 +180,23 @@ def on_a(event):
 hook.register(Key.A, on_a, trigger="down")
 ```
 
+### Event logging with `KeyWriter`
+
+Use `KeyWriter` as a `listen` callback to write key events to a file:
+
+```python
+from keyboard_hook import HotkeyHook, Key, KeyWriter
+
+hook = HotkeyHook()
+writer = KeyWriter("logs/keys.log")
+
+hook.register(Key.ESCAPE, hook.stop, trigger="first_down")
+hook.listen(writer)
+
+with hook:
+    hook.wait()
+```
+
 ### KeyEvent model
 
 `KeyEvent` fields and helpers:
@@ -200,8 +220,8 @@ python -m pytest -q
 Example passing output:
 
 ```text
-.........................                                                [100%]
-25 passed in 0.16s
+..........................................                               [100%]
+42 passed in 0.19s
 ```
 
 Green dots are good. Panic is optional.

@@ -6,6 +6,7 @@ from .process  import ProcessKeyboardHook
 from .events   import KeyEvent
 from .constants import Key, KeyCombo, VK
 from .decorators import debounce, keydown_only, keyup_only, once, throttle
+from .writer import KeyWriter
 
 __all__ = [
     "KeyboardHook",
@@ -16,6 +17,7 @@ __all__ = [
     "Key",
     "KeyCombo",
     "VK",
+    "KeyWriter",
     "once",
     "keydown_only",
     "keyup_only",

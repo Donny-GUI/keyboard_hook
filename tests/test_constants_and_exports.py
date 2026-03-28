@@ -2,6 +2,7 @@ import keyboard_hook
 from keyboard_hook.constants import Key, KeyCombo, VK
 from keyboard_hook.process import ProcessKeyboardHook
 from keyboard_hook.threaded import HotkeyHook
+from keyboard_hook.writer import KeyWriter
 
 
 def test_vk_contains_common_keys():
@@ -34,6 +35,7 @@ def test_package_public_exports_present():
         "Key",
         "KeyCombo",
         "VK",
+        "KeyWriter",
     }
     assert expected.issubset(set(keyboard_hook.__all__))
 
@@ -48,6 +50,10 @@ def test_exported_key_matches_constants_key():
 
 def test_exported_keycombo_matches_constants_keycombo():
     assert keyboard_hook.KeyCombo is KeyCombo
+
+
+def test_exported_keywriter_matches_writer_keywriter():
+    assert keyboard_hook.KeyWriter is KeyWriter
 
 
 def test_keycombo_constructor_accepts_string_iterable_and_varargs():

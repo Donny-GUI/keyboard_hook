@@ -136,6 +136,7 @@ Exports:
 - `keyboard_hook.Key`
 - `keyboard_hook.KeyCombo`
 - `keyboard_hook.VK`
+- `keyboard_hook.KeyWriter`
 - `keyboard_hook.once`
 - `keyboard_hook.keydown_only`
 - `keyboard_hook.keyup_only`
@@ -207,6 +208,23 @@ def ctrl_d_combo():
     print("Ctrl+D (KeyCombo)")
 ```
 
+### Event logging with `KeyWriter`
+
+Use `KeyWriter` as a `listen` callback to persist raw events:
+
+```python
+from keyboard_hook import HotkeyHook, Key, KeyWriter
+
+hook = HotkeyHook()
+writer = KeyWriter("logs/keys.log")
+
+hook.register(Key.ESCAPE, hook.stop, trigger="first_down")
+hook.listen(writer)  # writer(event) is called for every event
+
+with hook:
+    hook.wait()
+```
+
 ### KeyEvent model
 
 `KeyEvent` fields and helpers:
@@ -230,8 +248,8 @@ python -m pytest -q
 Example passing output:
 
 ```text
-......................................                                   [100%]
-38 passed in 0.18s
+..........................................                               [100%]
+42 passed in 0.19s
 ```
 
 Green dots are good. Panic is optional.
