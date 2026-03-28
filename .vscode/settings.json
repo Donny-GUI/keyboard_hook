@@ -1,0 +1,21 @@
+{
+    "cSpell.words": [
+        "HARDWAREINPUT",
+        "hiword",
+        "INITMENU",
+        "INITMENUPOPUP",
+        "KBDLLHOOKSTRUCT",
+        "KEYBDINPUT",
+        "KEYEVENTF",
+        "KEYUP",
+        "LLKHF",
+        "MOUSEINPUT",
+        "SYSKEYUP",
+        "ulonglong",
+        "WINFUNCTYPE"
+    ],
+    "cspell.enabled": false,
+    "cSpell.engines": {
+
+    }
+}

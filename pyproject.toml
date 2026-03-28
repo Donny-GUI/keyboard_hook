@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keyboard-hook"
+version = "0.1.0"
+description = "Windows keyboard hook library built on ctypes"
+readme = "keyboard_hook/README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "show_key_mouse_input maintainers" }
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: Microsoft :: Windows",
+  "Topic :: Software Development :: Libraries"
+]
+
+[tool.setuptools]
+packages = ["keyboard_hook"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

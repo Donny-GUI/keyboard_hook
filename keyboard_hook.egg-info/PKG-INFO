@@ -1,0 +1,113 @@
+Metadata-Version: 2.4
+Name: keyboard-hook
+Version: 0.1.0
+Summary: Windows keyboard hook library built on ctypes
+Author: show_key_mouse_input maintainers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Topic :: Software Development :: Libraries
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+
+# keyboard_hook
+
+A modular, threaded, and process-isolated Windows keyboard hook library built on `ctypes`.
+
+## Structure
+
+```
+keyboard_hook/
+├── __init__.py      # Public API
+├── constants.py     # WM_* messages, VK key name map
+├── winfunc.py       # Declarative Win32 function base class
+├── bindings.py      # All Win32 API bindings
+├── events.py        # KeyEvent dataclass + KBDLLHOOKSTRUCT
+├── hook.py          # Base KeyboardHook (blocking)
+├── threaded.py      # ThreadedKeyboardHook + HotkeyHook
+├── process.py       # ProcessKeyboardHook
+└── example.py       # Usage examples
+```
+
+## Quick Start
+
+### HotkeyHook (threaded, recommended for most use cases)
+
+```python
+from keyboard_hook import HotkeyHook
+
+hook = HotkeyHook()
+hook.register("ESCAPE", hook.stop)
+hook.register("A", lambda: print("A pressed"))
+hook.register("F5", lambda: print("F5!"), on_keyup=True)  # fire on release
+hook.listen(lambda e: print(e))  # raw listener for every event
+
+with hook:
+    hook.wait()
+```
+
+### ProcessKeyboardHook (isolated process, always stoppable)
+
+```python
+from keyboard_hook import ProcessKeyboardHook
+
+hook = ProcessKeyboardHook()
+hook.register("ESCAPE", hook.stop)
+hook.register("A", lambda: print("A pressed"))
+
+with hook:
+    hook.wait()
+
+# Force kill if needed (e.g. from another thread)
+hook.kill()
+```
+
+### KeyboardHook (raw, blocking)
+
+```python
+from keyboard_hook import KeyboardHook, KeyEvent
+
+def on_key(event: KeyEvent) -> bool:
+    print(event)
+    return False  # don't suppress
+
+with KeyboardHook(on_key=on_key) as hook:
+    hook.run()   # blocks until hook.stop() is called
+```
+
+## Key Names
+
+Keys can be registered by name or raw `vk_code` int:
+
+```python
+hook.register("ESCAPE", ...)
+hook.register("SPACE", ...)
+hook.register("F5", ...)
+hook.register("A", ...)       # A-Z supported
+hook.register("1", ...)       # 0-9 supported
+hook.register(0x1B, ...)      # raw vk_code also works
+```
+
+Full list available in `keyboard_hook.VK`.
+
+## KeyEvent Properties
+
+```python
+event.vk_code    # virtual key code
+event.scan_code  # hardware scan code
+event.flags      # raw flags
+event.time       # timestamp
+event.is_keydown # True on key press
+event.is_keyup   # True on key release
+event.is_injected  # True if sent by software
+event.is_extended  # True for numpad/arrow keys
+```
+
+## Class Overview
+
+| Class | Thread | Process | Use when |
+|---|---|---|---|
+| `KeyboardHook` | Caller | Same | Full control, manual threading |
+| `ThreadedKeyboardHook` | Background | Same | Simple background hook |
+| `HotkeyHook` | Background | Same | Hotkey registration + wait() |
+| `ProcessKeyboardHook` | Background | Child | Must always be killable |
