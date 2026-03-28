@@ -1,27 +1,33 @@
-# keyboard_hook
+# keyboard_hook ⌨️🪝
 
 ![Tests](https://github.com/OWNER/REPO/actions/workflows/tests.yml/badge.svg)
 
-Windows low-level keyboard hook library built on ctypes and the Win32 LL keyboard hook API.
+Windows low-level keyboard hook library built on `ctypes` + Win32 LL keyboard hook APIs.
+
+Because sometimes you need to know exactly which key was pressed, and when.  
+And sometimes you just need to catch that one key that keeps ruining your day.
 
 It provides three operation modes:
-- KeyboardHook: blocking loop on the caller thread
-- ThreadedKeyboardHook and HotkeyHook: non-blocking background thread
-- ProcessKeyboardHook: child-process isolation with hard-kill fallback
+- `KeyboardHook`: blocking loop on the caller thread (old-school, direct, no nonsense)
+- `ThreadedKeyboardHook` and `HotkeyHook`: non-blocking background thread (lets your app breathe)
+- `ProcessKeyboardHook`: child-process isolation with hard-kill fallback (for when chaos is expected)
 
-## Highlights
+## Highlights ✨
 
 - No runtime dependencies outside the Python standard library.
 - Small, explicit API for key events and hotkey registration.
+- Combo support (for example, `CTRL+SHIFT+S`) and configurable trigger modes.
 - Supports graceful shutdown and forced termination (process mode).
 - Designed for local desktop automation and hotkey-driven utilities.
 
-## Platform and requirements
+## Platform and requirements 🪟
 
 - OS: Windows only
 - Python: 3.10+
 
-## Installation
+If you run this on macOS/Linux, the README will still support you emotionally, but the hook will not.
+
+## Installation 📦
 
 ### Local development install
 
@@ -41,17 +47,18 @@ python -m pip install .
 python -m pip install keyboard-hook
 ```
 
-## Quickstart
+## Quickstart 🚀
 
-Recommended entry point: HotkeyHook.
+Recommended entry point: `HotkeyHook`.
 
 ```python
-from keyboard_hook import HotkeyHook
+from keyboard_hook import HotkeyHook, Key
 
 hook = HotkeyHook()
-hook.register("ESCAPE", hook.stop)
-hook.register("A", lambda: print("A pressed"))
-hook.register("F5", lambda: print("F5 released"), on_keyup=True)
+hook.register(Key.ESCAPE, hook.stop)
+hook.register(Key.A, lambda: print("A pressed"))
+hook.register(Key.F5, lambda: print("F5 released"), on_keyup=True)
+hook.register_combo("CTRL+SHIFT+S", lambda: print("Save!"), trigger="first_down")
 hook.listen(lambda event: print(event))
 
 with hook:
@@ -64,16 +71,16 @@ Run the included demo from repository root:
 python keyboard_hook/example.py
 ```
 
-## Usage
+## Usage 🛠️
 
 ### Class selection
 
 | Class | Thread model | Process model | Typical usage |
 |---|---|---|---|
-| KeyboardHook | Calling thread | Same process | Full control over the message loop |
-| ThreadedKeyboardHook | Background thread | Same process | Integrate into existing non-blocking app |
-| HotkeyHook | Background thread | Same process | Register hotkeys with simple API |
-| ProcessKeyboardHook | Background reader thread | Child process hook | Isolation and kill-on-failure safety |
+| `KeyboardHook` | Calling thread | Same process | Full control over the message loop |
+| `ThreadedKeyboardHook` | Background thread | Same process | Integrate into existing non-blocking app |
+| `HotkeyHook` | Background thread | Same process | Register hotkeys with simple API |
+| `ProcessKeyboardHook` | Background reader thread | Child process hook | Isolation and kill-on-failure safety |
 
 ### Lifecycle pattern
 
@@ -85,16 +92,17 @@ with hook:
 ```
 
 Shutdown behavior:
-- stop: graceful shutdown request
-- kill (ProcessKeyboardHook only): force terminate child hook process
+- `stop`: graceful shutdown request
+- `kill` (`ProcessKeyboardHook` only): force terminate child hook process
 
 ### Callback semantics
 
-- HotkeyHook.register callbacks take no arguments.
-- listen callbacks receive a KeyEvent for every key event.
-- KeyboardHook on_key can return True to suppress key propagation.
+- `HotkeyHook.register` callbacks can take no args or one `KeyEvent`.
+- `register` / `register_combo` callbacks may also accept one `KeyEvent` argument.
+- `listen` callbacks receive a `KeyEvent` for every key event.
+- `KeyboardHook` `on_key` can return `True` to suppress key propagation.
 
-Suppress A on keydown:
+Suppress `A` on keydown:
 
 ```python
 from keyboard_hook import KeyboardHook, KeyEvent
@@ -110,33 +118,78 @@ with KeyboardHook(on_key=on_key) as hook:
 
 ### Key registration
 
-Register keys by VK name or integer VK code:
+Register keys by `Key` enum, VK name, or integer VK code:
 
 ```python
-hook.register("ESCAPE", callback)
-hook.register("SPACE", callback)
-hook.register("F5", callback)
-hook.register("A", callback)
-hook.register("1", callback)
+hook.register(Key.ESCAPE, callback)
+hook.register(Key.SPACE, callback)
+hook.register(Key.F5, callback)
+hook.register(Key.A, callback)
+hook.register(Key.NUM_1, callback)
+hook.register("1", callback)     # VK name still supported
 hook.register(0x1B, callback)
+hook.register_combo("CTRL+SHIFT+S", callback)
 ```
 
-Key map export:
-- keyboard_hook.VK
+Exports:
+- `keyboard_hook.Key`
+- `keyboard_hook.VK`
+- `keyboard_hook.once`
+- `keyboard_hook.keydown_only`
+- `keyboard_hook.keyup_only`
+- `keyboard_hook.throttle`
+- `keyboard_hook.debounce`
+
+### Trigger modes
+
+You can control when callbacks fire:
+- `down`: every keydown message (including repeats)
+- `first_down`: first keydown only (no auto-repeat spam)
+- `repeat`: key auto-repeat only
+- `up`: on key release
+
+```python
+hook.register(Key.A, callback, trigger="first_down")
+hook.register(Key.A, callback, trigger="repeat")
+hook.register(Key.A, callback, trigger="up")
+hook.register(Key.A, callback, on_keyup=True)  # alias for trigger="up"
+```
+
+### Callback decorators
+
+Built-in decorators help keep hotkey callbacks clean:
+- `@once`: run a callback only once
+- `@keydown_only`: ignore non-keydown events
+- `@keyup_only`: ignore non-keyup events
+- `@throttle(seconds)`: limit execution rate
+- `@debounce(seconds)`: execute once after input quiets down
+
+```python
+from keyboard_hook import HotkeyHook, Key, throttle, keydown_only
+
+hook = HotkeyHook()
+
+@throttle(0.2)
+@keydown_only
+def on_a(event):
+    print("A keydown:", event.vk_code)
+
+hook.register(Key.A, on_a, trigger="down")
+```
 
 ### KeyEvent model
 
-KeyEvent fields and helpers:
-- vk_code
-- scan_code
-- flags
-- time
-- is_keydown
-- is_keyup
-- is_injected
-- is_extended
+`KeyEvent` fields and helpers:
+- `vk_code`
+- `scan_code`
+- `flags`
+- `time`
+- `is_keydown`
+- `is_keyup`
+- `is_injected`
+- `is_extended`
 
-## Testing
+## Testing ✅
 
 Run tests from repository root:
 
@@ -147,26 +200,28 @@ python -m pytest -q
 Example passing output:
 
 ```text
-.......                                                                  [100%]
-7 passed in 0.10s
+.........................                                                [100%]
+25 passed in 0.16s
 ```
 
-## CI
+Green dots are good. Panic is optional.
+
+## CI 🤖
 
 Workflow file:
-- .github/workflows/tests.yml
+- `.github/workflows/tests.yml`
 
 Pipeline behavior:
-- Trigger: push, pull_request
-- OS: windows-latest
-- Python matrix: 3.10, 3.11, 3.12, 3.13
+- Trigger: `push`, `pull_request`
+- OS: `windows-latest`
+- Python matrix: `3.10`, `3.11`, `3.12`, `3.13`
 
-To activate the badge, replace OWNER/REPO in the badge URL with the real repository path.
+To activate the badge, replace `OWNER/REPO` in the badge URL with the real repository path.
 
-## Packaging and release
+## Packaging and release 📦🚢
 
 Release checklist:
-1. Update version in pyproject.toml.
+1. Update version in `pyproject.toml`.
 2. Run tests locally and in CI.
 3. Build source and wheel distributions.
 4. Publish artifacts.
@@ -178,23 +233,23 @@ python -m pip install build
 python -m build
 ```
 
-## License
+## License 📜
 
 This project is released under the MIT License.
 
 See [LICENSE](../LICENSE).
 
-## Contributing
+## Contributing 🤝
 
 Contributions are welcome.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for development setup, coding standards, and pull request guidance.
 
-## Changelog
+## Changelog 🗒️
 
 Release history is tracked in [CHANGELOG.md](../CHANGELOG.md).
 
-## Repository layout
+## Repository layout 🧭
 
 ```text
 keyboard_hook/
@@ -215,14 +270,14 @@ CONTRIBUTING.md
 CHANGELOG.md
 ```
 
-## Operational notes
+## Operational notes ⚙️
 
 - Keep callback functions short and non-blocking.
 - Offload heavy work to worker threads/queues.
-- Prefer ProcessKeyboardHook when callback code may fail unpredictably.
+- Prefer `ProcessKeyboardHook` when callback code may fail unpredictably.
 
-## Troubleshooting
+## Troubleshooting 🧯
 
 - Hook fails to start: verify Windows platform and Python version.
-- No events received: keep process alive inside with hook context.
-- Shutdown hangs: call stop first; use kill for ProcessKeyboardHook fallback.
+- No events received: keep process alive inside `with hook` context.
+- Shutdown hangs: call `stop` first; use `kill` for `ProcessKeyboardHook` fallback.
