@@ -1,3 +1,5 @@
+"""Process-isolated keyboard hook that forwards events to the parent."""
+
 from __future__ import annotations
 import ctypes
 import logging
@@ -17,8 +19,10 @@ _STOP  = "stop"
 
 def _hook_process_main(pipe, log_level: int):
     """
-    Child process entry point.
-    Must be a top-level function for multiprocessing spawn to pickle it.
+    Child process entry point for the hook worker.
+
+    This function is module-level so it can be pickled by the
+    ``multiprocessing`` spawn start method used on Windows.
     """
     import ctypes
     from ctypes import wintypes
@@ -103,6 +107,7 @@ class ProcessKeyboardHook:
     """
 
     def __init__(self, log_level: int = logging.WARNING):
+        """Create a process-backed hook controller."""
         self._log_level  = log_level
         self._hotkeys    : dict[int, list[tuple[Callable, bool]]] = {}
         self._listeners  : list[Callable[[KeyEvent], None]] = []
@@ -114,11 +119,13 @@ class ProcessKeyboardHook:
     # --- Registration ---
 
     def register(self, key: str | int, callback: Callable, *, on_keyup=False) -> ProcessKeyboardHook:
+        """Register a callback for a key-down or key-up edge."""
         vk = self._resolve(key)
         self._hotkeys.setdefault(vk, []).append((callback, on_keyup))
         return self
 
     def unregister(self, key: str | int, callback: Callable | None = None) -> ProcessKeyboardHook:
+        """Remove one callback for a key, or all callbacks for that key."""
         vk = self._resolve(key)
         if callback is None:
             self._hotkeys.pop(vk, None)
@@ -128,15 +135,18 @@ class ProcessKeyboardHook:
         return self
 
     def listen(self, callback: Callable[[KeyEvent], None]) -> ProcessKeyboardHook:
+        """Register a listener that receives every forwarded :class:`KeyEvent`."""
         self._listeners.append(callback)
         return self
 
     def unlisten(self, callback: Callable[[KeyEvent], None]) -> ProcessKeyboardHook:
+        """Remove a listener previously added with :meth:`listen`."""
         self._listeners = [cb for cb in self._listeners if cb is not callback]
         return self
 
     @staticmethod
     def _resolve(key: str | int) -> int:
+        """Resolve a key name or virtual key code to an integer vk code."""
         if isinstance(key, int):
             return key
         from .constants import VK
@@ -148,6 +158,7 @@ class ProcessKeyboardHook:
     # --- Lifecycle ---
 
     def start(self, timeout: float = 5.0):
+        """Start the hook child process and reader thread."""
         if self._process and self._process.is_alive():
             raise RuntimeError("Hook process already running")
 
@@ -164,11 +175,22 @@ class ProcessKeyboardHook:
         child_conn.close()
 
         if not parent_conn.poll(timeout):
-            self._process.terminate()
+            if self._process.is_alive():
+                self._process.terminate()
+            self._process.join(1.0)
+            parent_conn.close()
+            self._pipe = None
+            self._process = None
             raise RuntimeError("Hook process did not start within timeout")
 
         msg = parent_conn.recv()
         if msg != _READY:
+            if self._process.is_alive():
+                self._process.terminate()
+            self._process.join(1.0)
+            parent_conn.close()
+            self._pipe = None
+            self._process = None
             raise RuntimeError(f"Unexpected startup message: {msg!r}")
 
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
@@ -192,6 +214,7 @@ class ProcessKeyboardHook:
         self._stopped.set()
 
     def join(self, timeout: float = 3.0):
+        """Wait for child process and reader thread shutdown."""
         if self._process:
             self._process.join(timeout)
             if self._process.is_alive():
@@ -206,11 +229,13 @@ class ProcessKeyboardHook:
 
     @property
     def running(self) -> bool:
+        """Return ``True`` while the child hook process is alive."""
         return self._process is not None and self._process.is_alive()
 
     # --- Event loop ---
 
     def _read_loop(self):
+        """Receive events from the child process and dispatch them locally."""
         while True:
             try:
                 if not self._pipe.poll(0.05):
@@ -227,6 +252,7 @@ class ProcessKeyboardHook:
         self._stopped.set()
 
     def _dispatch(self, event: KeyEvent):
+        """Dispatch one event to listeners and matching registered hotkeys."""
         for cb in self._listeners:
             try:
                 cb(event)
@@ -243,10 +269,12 @@ class ProcessKeyboardHook:
     # --- Context manager ---
 
     def __enter__(self):
+        """Start the child hook process on context manager entry."""
         self.start()
         return self
 
     def __exit__(self, *_):
+        """Stop and join worker resources on context manager exit."""
         self.stop()
         self.join()
 

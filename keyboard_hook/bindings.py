@@ -1,9 +1,12 @@
+"""Typed Win32 API bindings used by the keyboard hook implementation."""
+
 import ctypes
 from ctypes import wintypes
 from .winfunc import User32Func, Kernel32Func
 
 
 class SetWindowsHookExW(User32Func):
+    """Wrap ``user32.SetWindowsHookExW`` for low-level hook installation."""
     name     = "SetWindowsHookExW"
     restype  = wintypes.HHOOK
     argtypes = (
@@ -14,11 +17,13 @@ class SetWindowsHookExW(User32Func):
     )
 
 class UnhookWindowsHookEx(User32Func):
+    """Wrap ``user32.UnhookWindowsHookEx`` to remove installed hooks."""
     name     = "UnhookWindowsHookEx"
     restype  = wintypes.BOOL
     argtypes = (wintypes.HHOOK,)
 
 class CallNextHookEx(User32Func):
+    """Wrap ``user32.CallNextHookEx`` to continue hook chain processing."""
     name          = "CallNextHookEx"
     restype       = wintypes.LPARAM
     null_is_error = False
@@ -30,6 +35,7 @@ class CallNextHookEx(User32Func):
     )
 
 class GetMessageW(User32Func):
+    """Wrap ``user32.GetMessageW`` to pump the thread message queue."""
     name          = "GetMessageW"
     restype       = wintypes.BOOL
     null_is_error = False
@@ -47,24 +53,28 @@ class GetMessageW(User32Func):
         return result
 
 class TranslateMessage(User32Func):
+    """Wrap ``user32.TranslateMessage`` for message loop integration."""
     name          = "TranslateMessage"
     restype       = wintypes.BOOL
     null_is_error = False
     argtypes      = (ctypes.POINTER(wintypes.MSG),)
 
 class DispatchMessageW(User32Func):
+    """Wrap ``user32.DispatchMessageW`` for message loop dispatch."""
     name          = "DispatchMessageW"
     restype       = wintypes.LPARAM
     null_is_error = False
     argtypes      = (ctypes.POINTER(wintypes.MSG),)
 
 class GetCurrentThreadId(Kernel32Func):
+    """Wrap ``kernel32.GetCurrentThreadId`` for loop targeting."""
     name          = "GetCurrentThreadId"
     restype       = wintypes.DWORD
     null_is_error = False
     argtypes      = ()
 
 class PostThreadMessageW(User32Func):
+    """Wrap ``user32.PostThreadMessageW`` to signal message loops."""
     name     = "PostThreadMessageW"
     restype  = wintypes.BOOL
     argtypes = (
@@ -75,7 +85,7 @@ class PostThreadMessageW(User32Func):
     )
 
 
-# Singletons — import these directly
+# Singleton callables - import these directly.
 set_hook        = SetWindowsHookExW()
 unhook          = UnhookWindowsHookEx()
 next_hook       = CallNextHookEx()

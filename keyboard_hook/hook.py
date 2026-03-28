@@ -1,3 +1,5 @@
+"""Core low-level keyboard hook implementation for a single thread."""
+
 from __future__ import annotations
 import ctypes
 import logging
@@ -50,6 +52,7 @@ class KeyboardHook:
     # --- Core ---
 
     def _hook_proc(self, n_code: int, w_param: int, l_param: int) -> int:
+        """Win32 low-level hook procedure invoked for each keyboard message."""
         if n_code >= 0:
             try:
                 event = KeyEvent.from_lparam(w_param, l_param)
@@ -64,12 +67,14 @@ class KeyboardHook:
         return next_hook(self._hook, n_code, w_param, l_param)
 
     def _default_error_handler(self, exc: Exception):
+        """Log callback failures and request loop shutdown."""
         logger.error("Hook callback error: %s", exc, exc_info=True)
         self.stop()
 
     # --- Lifecycle ---
 
     def install(self):
+        """Install the Win32 hook on the current thread."""
         if self._hook:
             raise RuntimeError("Hook already installed")
         self._thread_id = get_thread_id()
@@ -77,6 +82,7 @@ class KeyboardHook:
         logger.debug("Hook installed: %s (tid=%s)", self._hook, self._thread_id)
 
     def uninstall(self):
+        """Remove the Win32 hook if it is currently installed."""
         if self._hook:
             unhook(self._hook)
             self._hook      = None
@@ -97,15 +103,18 @@ class KeyboardHook:
 
     @property
     def running(self) -> bool:
+        """Return ``True`` when the hook handle is currently installed."""
         return self._hook is not None
 
     # --- Context manager ---
 
     def __enter__(self):
+        """Install the hook when entering a context manager block."""
         self.install()
         return self
 
     def __exit__(self, *_):
+        """Uninstall the hook when leaving a context manager block."""
         self.uninstall()
 
     def __repr__(self):

@@ -1,3 +1,5 @@
+"""Win32 constants and a convenience virtual-key lookup table."""
+
 WH_KEYBOARD_LL = 13
 
 WM_QUIT       = 0x0012
@@ -6,7 +8,7 @@ WM_KEYUP      = 0x0101
 WM_SYSKEYDOWN = 0x0104
 WM_SYSKEYUP   = 0x0105
 
-# Common virtual key codes
+# Common virtual key codes used by registration APIs.
 VK = {
     "ESCAPE"    : 0x1B,
     "SPACE"     : 0x20,

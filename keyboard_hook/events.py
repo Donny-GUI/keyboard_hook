@@ -1,12 +1,16 @@
+"""Event models and Win32 hook structures used by keyboard callbacks."""
+
 from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 from dataclasses import dataclass
+from typing import Callable
+
 from .constants import WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP
 
 
 class KBDLLHOOKSTRUCT(ctypes.Structure):
-    """Raw Win32 struct passed via lParam in the hook callback."""
+    """Raw Win32 struct passed via `l_param` to a low-level hook callback."""
     _fields_ = [
         ("vkCode",      wintypes.DWORD),
         ("scanCode",    wintypes.DWORD),
@@ -30,6 +34,7 @@ class KeyEvent:
 
     @classmethod
     def from_lparam(cls, w_param: int, l_param: int) -> KeyEvent:
+        """Create a :class:`KeyEvent` from raw hook callback parameters."""
         kb = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
         return cls(
             w_param   = w_param,
@@ -41,10 +46,12 @@ class KeyEvent:
 
     @property
     def is_keydown(self) -> bool:
+        """Return ``True`` when the message is a key-down event."""
         return self.w_param in (WM_KEYDOWN, WM_SYSKEYDOWN)
 
     @property
     def is_keyup(self) -> bool:
+        """Return ``True`` when the message is a key-up event."""
         return self.w_param in (WM_KEYUP, WM_SYSKEYUP)
 
     @property
@@ -64,6 +71,8 @@ class KeyEvent:
 
 # --- Callback types ---
 
-# Return True to suppress the key, False to pass through
-KeyCallback  = callable   # (KeyEvent) -> bool | None
-HookCallback = callable   # (KeyEvent) -> None  (for raw listeners)
+# Return True to suppress the key, False/None to pass through.
+KeyCallback = Callable[[KeyEvent], bool | None]
+
+# Listener that receives every key event.
+HookCallback = Callable[[KeyEvent], None]

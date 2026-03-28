@@ -1,3 +1,5 @@
+"""Public package exports for keyboard hook APIs."""
+
 from .hook     import KeyboardHook
 from .threaded import ThreadedKeyboardHook, HotkeyHook
 from .process  import ProcessKeyboardHook

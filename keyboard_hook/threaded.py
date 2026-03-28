@@ -1,3 +1,5 @@
+"""Thread-based wrappers that run keyboard hooks in background threads."""
+
 from __future__ import annotations
 import logging
 import threading
@@ -36,10 +38,14 @@ class ThreadedKeyboardHook(KeyboardHook):
         self._ready   = threading.Event()
 
     def _run(self):
+        """Install the hook and run the message loop on the worker thread."""
         self.install()
         self._ready.set()
-        self.run()
-        self.uninstall()
+        try:
+            self.run()
+        finally:
+            # Ensure the hook is always removed if the loop exits unexpectedly.
+            self.uninstall()
 
     def start(self, timeout: float = 2.0):
         """Start the hook thread and block until the hook is installed."""
@@ -53,18 +59,22 @@ class ThreadedKeyboardHook(KeyboardHook):
         logger.debug("Hook thread started")
 
     def join(self, timeout: float | None = None):
+        """Wait for the hook thread to exit."""
         if self._thread:
             self._thread.join(timeout)
 
     @property
     def running(self) -> bool:
+        """Return ``True`` while the background hook thread is alive."""
         return self._thread is not None and self._thread.is_alive()
 
     def __enter__(self):
+        """Start the hook thread when entering a context manager block."""
         self.start()
         return self
 
     def __exit__(self, *_):
+        """Stop and join the hook thread on context manager exit."""
         self.stop()
         self.join()
 
@@ -87,6 +97,7 @@ class HotkeyHook(ThreadedKeyboardHook):
     """
 
     def __init__(self, daemon: bool = True):
+        """Initialize a threaded hotkey hook with no registered callbacks."""
         super().__init__(on_key=self._dispatch, daemon=daemon)
         self._hotkeys  : dict[int, list[tuple[Callable, bool]]] = {}
         self._listeners: list[Callable[[KeyEvent], None]] = []
@@ -127,6 +138,7 @@ class HotkeyHook(ThreadedKeyboardHook):
         return self
 
     def unlisten(self, callback: Callable[[KeyEvent], None]) -> HotkeyHook:
+        """Remove a raw event listener previously added with :meth:`listen`."""
         self._listeners = [cb for cb in self._listeners if cb is not callback]
         return self
 
@@ -134,6 +146,7 @@ class HotkeyHook(ThreadedKeyboardHook):
 
     @staticmethod
     def _resolve(key: str | int) -> int:
+        """Resolve a key name or virtual key code to an integer vk code."""
         if isinstance(key, int):
             return key
         from .constants import VK
@@ -143,6 +156,7 @@ class HotkeyHook(ThreadedKeyboardHook):
             raise ValueError(f"Unknown key name: {key!r}. Use a VK name or raw int.") from None
 
     def _dispatch(self, event: KeyEvent) -> bool:
+        """Dispatch one event to listeners and matching hotkey callbacks."""
         # Raw listeners always fire
         for cb in self._listeners:
             try:
@@ -161,6 +175,7 @@ class HotkeyHook(ThreadedKeyboardHook):
         return False  # never suppress from here
 
     def stop(self):
+        """Stop the underlying hook loop and release :meth:`wait`."""
         super().stop()
         self._stopped.set()
 
@@ -169,5 +184,6 @@ class HotkeyHook(ThreadedKeyboardHook):
         self._stopped.wait()
 
     def __exit__(self, *_):
+        """Ensure shutdown signaling and thread join on context exit."""
         self.stop()
         self.join()

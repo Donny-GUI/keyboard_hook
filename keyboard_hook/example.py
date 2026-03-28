@@ -1,3 +1,5 @@
+"""Manual examples for threaded and process-based keyboard hooks."""
+
 import multiprocessing
 import logging
 from keyboard_hook import HotkeyHook, ProcessKeyboardHook, VK
@@ -6,6 +8,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 def threaded_example():
+    """Run a threaded hotkey demo until Escape is pressed."""
     hook = HotkeyHook()
     (hook
         .register("ESCAPE", hook.stop)
@@ -20,6 +23,7 @@ def threaded_example():
 
 
 def process_example():
+    """Run a process-backed hotkey demo until Escape is pressed."""
     hook = ProcessKeyboardHook()
     (hook
         .register("ESCAPE", hook.stop)

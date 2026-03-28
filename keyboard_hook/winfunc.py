@@ -1,3 +1,5 @@
+"""Declarative helpers for defining Win32 ctypes function wrappers."""
+
 import ctypes
 import logging
 
@@ -24,6 +26,7 @@ class WinFunc:
     log_calls     = False
 
     def __init_subclass__(cls, **kwargs):
+        """Bind subclass metadata to the underlying DLL function object."""
         super().__init_subclass__(**kwargs)
         if cls.lib is None or cls.name is None:
             return
@@ -35,6 +38,7 @@ class WinFunc:
 
     @classmethod
     def _errcheck(cls, result, func, args):
+        """Apply optional call logging and default Win32 error handling."""
         if cls.log_calls:
             logger.debug("%s%s -> %r", cls.name, args, result)
         if cls.null_is_error and not result:
@@ -42,6 +46,7 @@ class WinFunc:
         return result
 
     def __call__(self, *args):
+        """Invoke the underlying ctypes function."""
         return self._fn(*args)
 
     def __repr__(self):
@@ -49,8 +54,10 @@ class WinFunc:
 
 
 class User32Func(WinFunc):
+    """Base class for functions resolved from ``user32.dll``."""
     lib = ctypes.windll.user32
 
 
 class Kernel32Func(WinFunc):
+    """Base class for functions resolved from ``kernel32.dll``."""
     lib = ctypes.windll.kernel32
