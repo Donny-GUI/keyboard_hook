@@ -10,7 +10,7 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Callable, Iterable, Literal
 
-from .constants import Key
+from .constants import Key, KeyCombo, resolve_key
 from .events import KeyEvent
 
 logger = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ class ProcessKeyboardHook:
 
     def register_combo(
         self,
-        keys: str | Iterable[Key | str | int],
+        keys: KeyCombo | str | Iterable[Key | str | int],
         callback: Callable,
         *,
         trigger: TriggerMode = "first_down",
@@ -197,7 +197,7 @@ class ProcessKeyboardHook:
 
     def unregister_combo(
         self,
-        keys: str | Iterable[Key | str | int],
+        keys: KeyCombo | str | Iterable[Key | str | int],
         callback: Callable | None = None,
     ) -> ProcessKeyboardHook:
         """Remove a specific combo callback, or all callbacks for the combo."""
@@ -215,6 +215,38 @@ class ProcessKeyboardHook:
         self._listeners = [cb for cb in self._listeners if cb is not callback]
         return self
 
+    def on_down(self, key: Key | str | int) -> Callable[[Callable], Callable]:
+        """Decorator form of ``register(..., trigger="down")``."""
+        return self._decorator_for_key(key, trigger="down")
+
+    def on_up(self, key: Key | str | int) -> Callable[[Callable], Callable]:
+        """Decorator form of ``register(..., trigger="up")``."""
+        return self._decorator_for_key(key, trigger="up")
+
+    def on_first_down(self, key: Key | str | int) -> Callable[[Callable], Callable]:
+        """Decorator form of ``register(..., trigger="first_down")``."""
+        return self._decorator_for_key(key, trigger="first_down")
+
+    def on_repeat(self, key: Key | str | int) -> Callable[[Callable], Callable]:
+        """Decorator form of ``register(..., trigger="repeat")``."""
+        return self._decorator_for_key(key, trigger="repeat")
+
+    def on_combo(
+        self,
+        keys: KeyCombo | str | Iterable[Key | str | int],
+        *,
+        trigger: TriggerMode = "first_down",
+    ) -> Callable[[Callable], Callable]:
+        """Decorator form of ``register_combo`` (``KeyCombo``/string/list/tuple)."""
+        return self._decorator_for_combo(keys, trigger=trigger)
+
+    def on_event(self) -> Callable[[Callable[[KeyEvent], None]], Callable[[KeyEvent], None]]:
+        """Decorator form of :meth:`listen` for raw event listeners."""
+        def decorator(callback: Callable[[KeyEvent], None]) -> Callable[[KeyEvent], None]:
+            self.listen(callback)
+            return callback
+        return decorator
+
     @staticmethod
     def _normalize_trigger(*, trigger: TriggerMode | None, on_keyup: bool) -> TriggerMode:
         if trigger is None:
@@ -229,20 +261,29 @@ class ProcessKeyboardHook:
     @staticmethod
     def _resolve(key: Key | str | int) -> int:
         """Resolve a key name or virtual key code to an integer vk code."""
-        from .constants import VK
-        if isinstance(key, Key):
-            return int(key)
-        if isinstance(key, int):
-            return key
-        try:
-            return VK[key.upper()]
-        except KeyError:
-            raise ValueError(
-                f"Unknown key name: {key!r}. Use a VK name, Key enum member, or raw int."
-            ) from None
+        return resolve_key(key)
+
+    def _decorator_for_key(self, key: Key | str | int, *, trigger: TriggerMode) -> Callable[[Callable], Callable]:
+        def decorator(callback: Callable) -> Callable:
+            self.register(key, callback, trigger=trigger)
+            return callback
+        return decorator
+
+    def _decorator_for_combo(
+        self,
+        keys: KeyCombo | str | Iterable[Key | str | int],
+        *,
+        trigger: TriggerMode,
+    ) -> Callable[[Callable], Callable]:
+        def decorator(callback: Callable) -> Callable:
+            self.register_combo(keys, callback, trigger=trigger)
+            return callback
+        return decorator
 
     @classmethod
-    def _resolve_combo(cls, keys: str | Iterable[Key | str | int]) -> frozenset[int]:
+    def _resolve_combo(cls, keys: KeyCombo | str | Iterable[Key | str | int]) -> frozenset[int]:
+        if isinstance(keys, KeyCombo):
+            return keys.vk_codes
         if isinstance(keys, str):
             parts = [part.strip() for part in keys.split("+") if part.strip()]
             if not parts:

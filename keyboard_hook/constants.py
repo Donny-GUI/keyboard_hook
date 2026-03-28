@@ -1,6 +1,8 @@
-"""Win32 constants, virtual keys, and the :class:`Key` enum."""
+"""Win32 constants, virtual keys, and combo helpers."""
 
+from dataclasses import dataclass
 from enum import IntEnum
+from typing import Iterable
 
 WH_KEYBOARD_LL = 13
 
@@ -85,3 +87,53 @@ class Key(IntEnum):
 # This map preserves existing string-key behavior while adding enum-style names.
 VK = {name: int(member) for name, member in Key.__members__.items()}
 VK.update({str(n): int(Key[f"NUM_{n}"]) for n in range(10)})
+
+
+def resolve_key(key: Key | str | int) -> int:
+    """Resolve a key name, ``Key`` member, or raw vk code to ``int``."""
+    if isinstance(key, Key):
+        return int(key)
+    if isinstance(key, int):
+        return key
+    try:
+        return VK[key.upper()]
+    except KeyError:
+        raise ValueError(f"Unknown key name: {key!r}. Use a VK name, Key enum member, or raw int.") from None
+
+
+@dataclass(frozen=True, slots=True)
+class KeyCombo:
+    """Immutable key-combo container for combo registrations and decorators."""
+
+    vk_codes: frozenset[int]
+
+    def __init__(self, *keys: Key | str | int | Iterable[Key | str | int] | "KeyCombo"):
+        if len(keys) == 1:
+            first = keys[0]
+            if isinstance(first, KeyCombo):
+                object.__setattr__(self, "vk_codes", first.vk_codes)
+                return
+            if isinstance(first, str):
+                parts = [part.strip() for part in first.split("+") if part.strip()]
+                if not parts:
+                    raise ValueError("Combo string is empty")
+                object.__setattr__(self, "vk_codes", frozenset(resolve_key(part) for part in parts))
+                return
+            if isinstance(first, Iterable):
+                resolved = [resolve_key(part) for part in first]
+                if not resolved:
+                    raise ValueError("Combo must contain at least one key")
+                object.__setattr__(self, "vk_codes", frozenset(resolved))
+                return
+
+        resolved = [resolve_key(part) for part in keys]
+        if not resolved:
+            raise ValueError("Combo must contain at least one key")
+        object.__setattr__(self, "vk_codes", frozenset(resolved))
+
+    def __iter__(self):
+        """Iterate virtual key codes in sorted order for stable output."""
+        return iter(sorted(self.vk_codes))
+
+    def __len__(self) -> int:
+        return len(self.vk_codes)

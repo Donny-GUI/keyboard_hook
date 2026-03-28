@@ -129,10 +129,12 @@ hook.register(Key.NUM_1, callback)
 hook.register("1", callback)     # VK name still supported
 hook.register(0x1B, callback)
 hook.register_combo("CTRL+SHIFT+S", callback)
+hook.register_combo(KeyCombo(Key.CTRL, "S"), callback)
 ```
 
 Exports:
 - `keyboard_hook.Key`
+- `keyboard_hook.KeyCombo`
 - `keyboard_hook.VK`
 - `keyboard_hook.once`
 - `keyboard_hook.keydown_only`
@@ -177,6 +179,34 @@ def on_a(event):
 hook.register(Key.A, on_a, trigger="down")
 ```
 
+Decorator-style registration on hook instances:
+
+```python
+from keyboard_hook import HotkeyHook, Key, KeyCombo
+
+hook = HotkeyHook()
+
+@hook.on_down(Key.A)
+def on_a(event):
+    print("A down:", event.vk_code)
+
+@hook.on_combo("CTRL+SHIFT+S")
+def save():
+    print("Save combo")
+
+@hook.on_combo([Key.CTRL, "S"])
+def save_list():
+    print("Save (list)")
+
+@hook.on_combo((Key.CTRL, "A"))
+def ctrl_a_tuple():
+    print("Ctrl+A (tuple)")
+
+@hook.on_combo(KeyCombo(Key.CTRL, "D"))
+def ctrl_d_combo():
+    print("Ctrl+D (KeyCombo)")
+```
+
 ### KeyEvent model
 
 `KeyEvent` fields and helpers:
@@ -200,8 +230,8 @@ python -m pytest -q
 Example passing output:
 
 ```text
-.........................                                                [100%]
-25 passed in 0.16s
+......................................                                   [100%]
+38 passed in 0.18s
 ```
 
 Green dots are good. Panic is optional.

@@ -1,6 +1,6 @@
 import pytest
 
-from keyboard_hook.constants import Key, WM_KEYDOWN, WM_KEYUP
+from keyboard_hook.constants import Key, KeyCombo, WM_KEYDOWN, WM_KEYUP
 from keyboard_hook.events import KeyEvent
 from keyboard_hook.process import ProcessKeyboardHook
 from keyboard_hook.threaded import HotkeyHook
@@ -83,3 +83,81 @@ def test_unregister_combo_removes_binding(hook_type):
     hook._dispatch(_event(WM_KEYDOWN, Key.S))
 
     assert fired == []
+
+
+@pytest.mark.parametrize("hook_type", [HotkeyHook, ProcessKeyboardHook])
+def test_on_down_decorator_registers_callback(hook_type):
+    hook = hook_type()
+    seen = []
+
+    @hook.on_down(Key.A)
+    def on_a(event):
+        seen.append(event.vk_code)
+
+    hook._dispatch(_event(WM_KEYDOWN, Key.A))
+
+    assert seen == [int(Key.A)]
+
+
+@pytest.mark.parametrize("hook_type", [HotkeyHook, ProcessKeyboardHook])
+def test_on_combo_decorator_registers_callback(hook_type):
+    hook = hook_type()
+    fired = []
+
+    @hook.on_combo("CTRL+S", trigger="first_down")
+    def on_save():
+        fired.append("save")
+
+    hook._dispatch(_event(WM_KEYDOWN, Key.CTRL))
+    hook._dispatch(_event(WM_KEYDOWN, Key.S))
+
+    assert fired == ["save"]
+
+
+@pytest.mark.parametrize("hook_type", [HotkeyHook, ProcessKeyboardHook])
+def test_on_combo_decorator_accepts_list_and_tuple_of_key_or_string(hook_type):
+    hook = hook_type()
+    fired = []
+
+    @hook.on_combo([Key.CTRL, "S"], trigger="first_down")
+    def on_save_list():
+        fired.append("list")
+
+    @hook.on_combo((Key.CTRL, "A"), trigger="first_down")
+    def on_a_tuple():
+        fired.append("tuple")
+
+    hook._dispatch(_event(WM_KEYDOWN, Key.CTRL))
+    hook._dispatch(_event(WM_KEYDOWN, Key.S))
+    hook._dispatch(_event(WM_KEYDOWN, Key.A))
+
+    assert fired == ["list", "tuple"]
+
+
+@pytest.mark.parametrize("hook_type", [HotkeyHook, ProcessKeyboardHook])
+def test_on_combo_decorator_accepts_keycombo(hook_type):
+    hook = hook_type()
+    fired = []
+
+    @hook.on_combo(KeyCombo(Key.CTRL, "S"))
+    def on_save():
+        fired.append("combo")
+
+    hook._dispatch(_event(WM_KEYDOWN, Key.CTRL))
+    hook._dispatch(_event(WM_KEYDOWN, Key.S))
+
+    assert fired == ["combo"]
+
+
+@pytest.mark.parametrize("hook_type", [HotkeyHook, ProcessKeyboardHook])
+def test_on_event_decorator_registers_listener(hook_type):
+    hook = hook_type()
+    seen = []
+
+    @hook.on_event()
+    def on_event(event):
+        seen.append(event.vk_code)
+
+    hook._dispatch(_event(WM_KEYDOWN, Key.A))
+
+    assert seen == [int(Key.A)]
